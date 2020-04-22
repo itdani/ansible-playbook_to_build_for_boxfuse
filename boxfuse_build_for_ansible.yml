@@ -1,0 +1,79 @@
+---
+- name: build artefact
+  hosts: dev
+  become: yes
+
+  tasks:
+
+  - name: Run the equivalent of "apt-get update" as a separate step
+    apt:
+      update_cache: yes
+
+  - name: Ensure default-jdk package is present
+    apt:
+      name: default-jdk
+      state: present
+
+  - name: Ensure git package is present
+    apt:
+      name: git
+      state: present
+
+  - name: Ensure maven package is present
+    apt:
+      name: maven
+      state: present
+
+  - name: Git clone project
+    git:
+      repo: 'https://github.com/boxfuse/boxfuse-sample-java-war-hello.git'
+      dest: /tmp/boxfuse
+      clone: yes
+      update: yes
+
+  - name: This command will change the working directory to tmp/boxfuse and for maven packege.
+    shell:
+      cmd: mvn -f /tmp/boxfuse/pom.xml package
+      chdir: /tmp/boxfuse
+
+  - name: Synchronization of src on the inventory host to the dest on the localhost in pull mode
+    synchronize:
+      mode: pull
+      src: /tmp/boxfuse/target/hello-1.0.war
+      dest: /tmp/boxfuse/
+
+  - name: Remove useless packages from the cache
+    apt:
+      autoclean: yes
+
+  - name: Remove dependencies that are no longer required
+    apt:
+      autoremove: yes
+
+- name: run app
+  hosts: prod
+  become: yes
+
+  tasks:
+  - name: Ensure tomcat package is present
+    apt:
+      name: tomcat8
+      state: present
+
+  - name: tomcat8 service is started
+    service:
+      name: tomcat8
+      state: started
+
+  - name: Synchronization of src on the control machine to dest on the remote hosts
+    synchronize:
+      src: /tmp/boxfuse/hello-1.0.war
+      dest: /var/lib/tomcat8/webapps
+
+  - name: Remove useless packages from the cache
+    apt:
+      autoclean: yes
+
+  - name: Remove dependencies that are no longer required
+    apt:
+      autoremove: yes
